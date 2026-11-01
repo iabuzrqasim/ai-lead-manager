@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Follow-ups · AI Lead Manager</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="/static/css/app.css" rel="stylesheet">
+</head>
+<body>
+<div id="page">
+  <ul class="nav nav-pills mb-3 flex-nowrap overflow-auto" id="views">
+    <li class="nav-item"><button class="nav-link active" data-view="open">Open</button></li>
+    <li class="nav-item"><button class="nav-link" data-view="overdue">Overdue</button></li>
+    <li class="nav-item"><button class="nav-link" data-view="due">Due (draft ready)</button></li>
+    <li class="nav-item"><button class="nav-link" data-view="upcoming">Upcoming</button></li>
+    <li class="nav-item"><button class="nav-link" data-view="completed">Completed</button></li>
+    <li class="nav-item"><button class="nav-link" data-view="cancelled">Cancelled</button></li>
+  </ul>
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead><tr><th>Lead</th><th>Scheduled</th><th class="d-none d-md-table-cell">Channel</th>
+          <th class="d-none d-lg-table-cell">Note</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </div>
+  <p class="small text-secondary mt-3"><i class="bi bi-info-circle"></i>
+    The scheduler checks every minute. When a follow-up's time arrives it becomes <strong>Due</strong> and an email draft is prepared on the lead page for you to review. Nothing is ever sent automatically.</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/static/js/app.js"></script>
+<script>
+  renderLayout("follow-ups", "Follow-ups",
+    `<button class="btn btn-outline-primary btn-sm" id="run"><i class="bi bi-arrow-repeat"></i> Run check now</button>`);
+  let view = "open";
+
+  async function load() {
+    const rows = qs("#rows"); setLoading(rows, 6);
+    try {
+      const fus = await api(`/api/follow-ups?view=${view}&limit=200`);
+      rows.innerHTML = fus.length ? fus.map(f => {
+        const open = ["Pending", "Due"].includes(f.status);
+        return `<tr data-lead="${f.lead_id}">
+          <td><div class="fw-semibold">${esc(f.lead_name)}</div><div class="small text-secondary">${esc(f.lead_company || "")}</div></td>
+          <td class="${open && isPast(f.scheduled_at) ? "overdue" : ""}">${fmtDateTime(f.scheduled_at)}</td>
+          <td class="d-none d-md-table-cell text-capitalize">${esc(f.channel)}</td>
+          <td class="d-none d-lg-table-cell small text-secondary">${esc(f.note || "—")}</td>
+          <td>${statusBadge(f.status)}</td>
+          <td class="text-end text-nowrap">${open ? `
+            <button class="btn btn-sm btn-outline-success" data-act="complete" data-id="${f.id}" title="Complete"><i class="bi bi-check-lg"></i></button>
+            <button class="btn btn-sm btn-outline-secondary" data-act="cancel" data-id="${f.id}" title="Cancel"><i class="bi bi-x-lg"></i></button>` : ""}</td>
+        </tr>`; }).join("") : `<tr><td colspan="6">${emptyState("bi-calendar-check", "Nothing here.")}</td></tr>`;
+    } catch (ex) { rows.innerHTML = `<tr><td colspan="6" class="text-danger">${esc(ex.message)}</td></tr>`; }
+  }
+
+  qs("#views").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-view]"); if (!b) return;
+    qs("#views .active").classList.remove("active"); b.classList.add("active");
+    view = b.dataset.view; load();
+  });
+  qs("#rows").addEventListener("click", async (e) => {
+    const b = e.target.closest("button[data-act]");
+    if (b) {
+      e.stopPropagation();
+      try { await api(`/api/follow-ups/${b.dataset.id}/${b.dataset.act}`, { method: "POST" }); toast("Updated"); load(); }
+      catch (ex) { toast(ex.message, "error"); }
+      return;
+    }
+    const tr = e.target.closest("tr[data-lead]"); if (tr) location.href = `/lead?id=${tr.dataset.lead}`;
+  });
+  qs("#run").onclick = async () => {
+    try { const r = await api("/api/follow-ups/run-now", { method: "POST" });
+      toast(r.processed.length ? `${r.processed.length} follow-up(s) processed, drafts ready` : "No follow-ups due right now"); load(); }
+    catch (ex) { toast(ex.message, "error"); }
+  };
+  load();
+</script>
+</body>
+</html>

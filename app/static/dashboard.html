@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard · AI Lead Manager</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="/static/css/app.css" rel="stylesheet">
+</head>
+<body>
+<div id="page">
+  <div class="alert alert-danger d-none" id="error"></div>
+
+  <div class="row g-3 mb-3" id="stats">
+    <div class="col-6 col-xl-3"><div class="card stat-card h-100"><div class="card-body d-flex justify-content-between">
+      <div><div class="label">Total leads</div><div class="value" id="s-total">–</div><div class="small text-secondary"><span id="s-open">–</span> open</div></div>
+      <div class="icon bg-primary-subtle text-primary"><i class="bi bi-people"></i></div></div></div></div>
+    <div class="col-6 col-xl-3"><div class="card stat-card h-100"><div class="card-body d-flex justify-content-between">
+      <div><div class="label">Conversion rate</div><div class="value" id="s-conv">–</div><div class="small text-secondary">Won ÷ closed leads</div></div>
+      <div class="icon bg-success-subtle text-success"><i class="bi bi-graph-up-arrow"></i></div></div></div></div>
+    <div class="col-6 col-xl-3"><div class="card stat-card h-100"><div class="card-body d-flex justify-content-between">
+      <div><div class="label">Pipeline value</div><div class="value" id="s-pipe">–</div><div class="small text-secondary">Won: <span id="s-won-val">–</span></div></div>
+      <div class="icon bg-warning-subtle text-warning"><i class="bi bi-cash-stack"></i></div></div></div></div>
+    <div class="col-6 col-xl-3"><div class="card stat-card h-100"><div class="card-body d-flex justify-content-between">
+      <div><div class="label">Overdue follow-ups</div><div class="value" id="s-overdue">–</div><div class="small text-secondary"><span id="s-upcoming">–</span> due in next 7 days</div></div>
+      <div class="icon bg-danger-subtle text-danger"><i class="bi bi-alarm"></i></div></div></div></div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-lg-7"><div class="card h-100"><div class="card-body">
+      <h2 class="h6 mb-3">Leads by status</h2><div style="height:280px"><canvas id="chart-status"></canvas></div>
+    </div></div></div>
+    <div class="col-lg-5"><div class="card h-100"><div class="card-body">
+      <h2 class="h6 mb-3">Lead sources</h2><div style="height:280px"><canvas id="chart-source"></canvas></div>
+    </div></div></div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-7"><div class="card h-100"><div class="card-body">
+      <h2 class="h6 mb-3">New leads per month</h2><div style="height:260px"><canvas id="chart-month"></canvas></div>
+    </div></div></div>
+    <div class="col-lg-5"><div class="card h-100">
+      <div class="card-header bg-white d-flex align-items-center">
+        <h2 class="h6 mb-0 me-auto">Follow-ups needing attention</h2>
+        <a href="/follow-ups" class="small">View all</a>
+      </div>
+      <div class="list-group list-group-flush" id="fu-list"></div>
+    </div></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.js"></script>
+<script src="/static/js/app.js"></script>
+<script>
+  renderLayout("dashboard", "Dashboard",
+    `<a class="btn btn-primary btn-sm" href="/leads?new=1"><i class="bi bi-plus-lg"></i> New lead</a>`);
+
+  const STATUS_COLORS = { New: "#6366f1", Contacted: "#0ea5e9", Qualified: "#f59e0b", Proposal: "#8b5cf6", Won: "#22c55e", Lost: "#ef4444" };
+  const PALETTE = ["#4f46e5", "#0ea5e9", "#22c55e", "#f59e0b", "#ec4899", "#14b8a6", "#8b5cf6", "#64748b"];
+  Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+
+  async function load() {
+    setLoading(qs("#fu-list"));
+    try {
+      const [s, fus] = await Promise.all([
+        api("/api/analytics/dashboard"),
+        api("/api/follow-ups?view=open&limit=8"),
+      ]);
+      qs("#s-total").textContent = s.total_leads;
+      qs("#s-open").textContent = s.open_leads;
+      qs("#s-conv").textContent = s.conversion_rate + "%";
+      qs("#s-pipe").textContent = money(s.pipeline_value);
+      qs("#s-won-val").textContent = money(s.won_value);
+      qs("#s-overdue").textContent = s.overdue_follow_ups;
+      qs("#s-upcoming").textContent = s.upcoming_follow_ups;
+
+      new Chart(qs("#chart-status"), {
+        type: "bar",
+        data: { labels: Object.keys(s.by_status),
+          datasets: [{ data: Object.values(s.by_status), backgroundColor: Object.keys(s.by_status).map(k => STATUS_COLORS[k]), borderRadius: 6 }] },
+        options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } },
+      });
+      const sources = Object.keys(s.by_source);
+      new Chart(qs("#chart-source"), {
+        type: "doughnut",
+        data: { labels: sources, datasets: [{ data: Object.values(s.by_source), backgroundColor: PALETTE }] },
+        options: { maintainAspectRatio: false, plugins: { legend: { position: "bottom" } }, cutout: "62%" },
+      });
+      new Chart(qs("#chart-month"), {
+        type: "line",
+        data: { labels: s.leads_per_month.map(m => new Date(m.month + "-01").toLocaleDateString(undefined, { month: "short", year: "2-digit" })),
+          datasets: [{ data: s.leads_per_month.map(m => m.count), borderColor: "#4f46e5", backgroundColor: "rgba(79,70,229,.12)", fill: true, tension: .35 }] },
+        options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } },
+      });
+
+      qs("#fu-list").innerHTML = fus.length ? fus.map(f => `
+        <a class="list-group-item list-group-item-action" href="/lead?id=${f.lead_id}">
+          <div class="d-flex justify-content-between">
+            <strong>${esc(f.lead_name)}</strong>${statusBadge(f.status)}
+          </div>
+          <div class="small ${isPast(f.scheduled_at) ? "overdue" : "text-secondary"}">
+            <i class="bi bi-clock"></i> ${fmtDateTime(f.scheduled_at)} · ${esc(f.channel)}${f.lead_company ? " · " + esc(f.lead_company) : ""}
+          </div>
+        </a>`).join("") : emptyState("bi-check2-circle", "No open follow-ups. You're all caught up!");
+    } catch (ex) {
+      qs("#error").textContent = ex.message; qs("#error").classList.remove("d-none");
+      qs("#fu-list").innerHTML = "";
+    }
+  }
+  load();
+</script>
+</body>
+</html>

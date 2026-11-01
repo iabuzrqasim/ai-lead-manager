@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Leads · AI Lead Manager</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="/static/css/app.css" rel="stylesheet">
+</head>
+<body>
+<div id="page">
+  <div class="card mb-3"><div class="card-body">
+    <div class="row g-2">
+      <div class="col-md-5">
+        <div class="input-group"><span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+          <input class="form-control" id="q" placeholder="Search name, email or company"></div>
+      </div>
+      <div class="col-6 col-md-3"><select class="form-select" id="f-status"><option value="">All statuses</option></select></div>
+      <div class="col-6 col-md-2"><select class="form-select" id="f-source"><option value="">All sources</option></select></div>
+      <div class="col-md-2"><select class="form-select" id="f-sort">
+        <option value="created_at:desc">Newest first</option>
+        <option value="created_at:asc">Oldest first</option>
+        <option value="name:asc">Name A–Z</option>
+        <option value="estimated_value:desc">Highest value</option>
+        <option value="updated_at:desc">Recently updated</option>
+      </select></div>
+    </div>
+  </div></div>
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead><tr><th>Name</th><th class="d-none d-md-table-cell">Company</th><th>Status</th>
+          <th class="d-none d-lg-table-cell">Source</th><th class="d-none d-lg-table-cell text-end">Value</th>
+          <th class="d-none d-md-table-cell">Next follow-up</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="card-footer bg-white d-flex align-items-center">
+      <span class="small text-secondary me-auto" id="count"></span>
+      <div class="btn-group btn-group-sm">
+        <button class="btn btn-outline-secondary" id="prev"><i class="bi bi-chevron-left"></i></button>
+        <button class="btn btn-outline-secondary" id="next"><i class="bi bi-chevron-right"></i></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Lead form modal (create) -->
+<div class="modal fade" id="lead-modal" tabindex="-1">
+  <div class="modal-dialog modal-lg"><form class="modal-content" id="lead-form" novalidate>
+    <div class="modal-header"><h5 class="modal-title">New lead</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <div class="alert alert-danger d-none" id="form-error"></div>
+      <div class="row g-3">
+        <div class="col-md-6"><label class="form-label">Name *</label><input class="form-control" name="name" required minlength="2"></div>
+        <div class="col-md-6"><label class="form-label">Email *</label><input class="form-control" name="email" type="email" required></div>
+        <div class="col-md-6"><label class="form-label">Phone</label><input class="form-control" name="phone"></div>
+        <div class="col-md-6"><label class="form-label">Company</label><input class="form-control" name="company"></div>
+        <div class="col-md-4"><label class="form-label">Status</label><select class="form-select" name="status"></select></div>
+        <div class="col-md-4"><label class="form-label">Source</label><input class="form-control" name="source" list="sources" placeholder="Website, LinkedIn…"></div>
+        <div class="col-md-4"><label class="form-label">Estimated value ($)</label><input class="form-control" name="estimated_value" type="number" min="0" step="1"></div>
+        <div class="col-12"><label class="form-label">Notes</label><textarea class="form-control" name="notes" rows="3"></textarea></div>
+      </div>
+      <datalist id="sources"></datalist>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+      <button class="btn btn-primary" id="save">Save lead</button>
+    </div>
+  </form></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/static/js/app.js"></script>
+<script>
+  renderLayout("leads", "Leads", `<button class="btn btn-primary btn-sm" id="add"><i class="bi bi-plus-lg"></i> New lead</button>`);
+
+  const state = { page: 1, pageSize: 15 };
+  const modal = new bootstrap.Modal(qs("#lead-modal"));
+  qs("#f-status").innerHTML += STATUSES.map(s => `<option>${s}</option>`).join("");
+  qs("#lead-form [name=status]").innerHTML = STATUSES.map(s => `<option>${s}</option>`).join("");
+
+  async function loadSources() {
+    const sources = await api("/api/leads/sources").catch(() => []);
+    qs("#f-source").innerHTML = `<option value="">All sources</option>` + sources.map(s => `<option>${esc(s)}</option>`).join("");
+    qs("#sources").innerHTML = ["Website", "LinkedIn", "Referral", "Upwork", "Cold email", ...sources]
+      .filter((v, i, a) => a.indexOf(v) === i).map(s => `<option value="${esc(s)}">`).join("");
+  }
+
+  async function load() {
+    const rows = qs("#rows");
+    setLoading(rows, 6);
+    const [sort, order] = qs("#f-sort").value.split(":");
+    const params = new URLSearchParams({ page: state.page, page_size: state.pageSize, sort, order });
+    if (qs("#q").value.trim()) params.set("q", qs("#q").value.trim());
+    if (qs("#f-status").value) params.set("status", qs("#f-status").value);
+    if (qs("#f-source").value) params.set("source", qs("#f-source").value);
+    try {
+      const data = await api(`/api/leads?${params}`);
+      rows.innerHTML = data.items.length ? data.items.map(l => `
+        <tr data-id="${l.id}">
+          <td><div class="fw-semibold">${esc(l.name)}</div><div class="small text-secondary">${esc(l.email)}</div></td>
+          <td class="d-none d-md-table-cell">${esc(l.company || "—")}</td>
+          <td>${statusBadge(l.status)}</td>
+          <td class="d-none d-lg-table-cell">${esc(l.source || "—")}</td>
+          <td class="d-none d-lg-table-cell text-end">${money(l.estimated_value)}</td>
+          <td class="d-none d-md-table-cell ${isPast(l.next_follow_up) ? "overdue" : ""}">${fmtDateTime(l.next_follow_up)}</td>
+        </tr>`).join("")
+        : `<tr><td colspan="6">${emptyState("bi-inbox", "No leads match your filters.")}</td></tr>`;
+      const start = data.total ? (data.page - 1) * data.page_size + 1 : 0;
+      qs("#count").textContent = `${start}–${start + data.items.length - (data.total ? 1 : 0)} of ${data.total} leads`;
+      qs("#prev").disabled = data.page <= 1;
+      qs("#next").disabled = data.page * data.page_size >= data.total;
+    } catch (ex) {
+      rows.innerHTML = `<tr><td colspan="6" class="text-danger">${esc(ex.message)}</td></tr>`;
+    }
+  }
+
+  let timer;
+  qs("#q").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(() => { state.page = 1; load(); }, 300); });
+  ["#f-status", "#f-source", "#f-sort"].forEach(s => qs(s).addEventListener("change", () => { state.page = 1; load(); }));
+  qs("#prev").onclick = () => { state.page--; load(); };
+  qs("#next").onclick = () => { state.page++; load(); };
+  qs("#rows").addEventListener("click", (e) => { const tr = e.target.closest("tr[data-id]"); if (tr) location.href = `/lead?id=${tr.dataset.id}`; });
+
+  function openCreate() { qs("#lead-form").reset(); qs("#form-error").classList.add("d-none"); modal.show(); }
+  qs("#add").onclick = openCreate;
+  if (new URLSearchParams(location.search).get("new")) openCreate();
+
+  qs("#lead-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.target, err = qs("#form-error");
+    if (!form.checkValidity()) { form.classList.add("was-validated"); return; }
+    const body = formToObject(form);
+    if (body.estimated_value != null) body.estimated_value = Number(body.estimated_value);
+    qs("#save").disabled = true;
+    try {
+      const lead = await api("/api/leads", { method: "POST", body });
+      modal.hide(); toast("Lead created");
+      location.href = `/lead?id=${lead.id}`;
+    } catch (ex) { err.textContent = ex.message; err.classList.remove("d-none"); }
+    finally { qs("#save").disabled = false; }
+  });
+
+  loadSources(); load();
+</script>
+</body>
+</html>

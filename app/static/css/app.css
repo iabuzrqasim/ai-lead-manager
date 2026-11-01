@@ -1,0 +1,83 @@
+:root {
+  --brand: #4f46e5;
+  --brand-dark: #3730a3;
+  --sidebar: #111827;
+  --bg: #f5f6fa;
+}
+
+body { background: var(--bg); font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; }
+
+.btn-primary { --bs-btn-bg: var(--brand); --bs-btn-border-color: var(--brand);
+  --bs-btn-hover-bg: var(--brand-dark); --bs-btn-hover-border-color: var(--brand-dark);
+  --bs-btn-active-bg: var(--brand-dark); }
+.text-brand { color: var(--brand) !important; }
+a { color: var(--brand); }
+
+/* Layout */
+.app-shell { display: flex; min-height: 100vh; }
+.sidebar { width: 240px; background: var(--sidebar); color: #cbd5e1; flex-shrink: 0;
+  position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; }
+.sidebar .brand { color: #fff; font-weight: 700; font-size: 1.1rem; padding: 1.25rem 1.25rem 0.25rem; }
+.sidebar .brand small { display: block; font-weight: 400; font-size: .75rem; color: #94a3b8; }
+.sidebar .nav-link { color: #cbd5e1; border-radius: .5rem; margin: .1rem .75rem; padding: .55rem .9rem; }
+.sidebar .nav-link:hover { background: rgba(255,255,255,.06); color: #fff; }
+.sidebar .nav-link.active { background: var(--brand); color: #fff; }
+.sidebar .nav-link i { width: 1.4rem; display: inline-block; }
+.main { flex: 1; min-width: 0; }
+.topbar { background: #fff; border-bottom: 1px solid #e5e7eb; padding: .85rem 1.5rem;
+  display: flex; align-items: center; gap: .75rem; position: sticky; top: 0; z-index: 10; }
+.content { padding: 1.5rem; }
+
+@media (max-width: 991.98px) {
+  .sidebar { position: fixed; left: -260px; z-index: 1040; transition: left .2s; }
+  .sidebar.open { left: 0; }
+  .content { padding: 1rem; }
+}
+
+/* Cards */
+.card { border: 1px solid #e5e7eb; border-radius: .75rem; box-shadow: 0 1px 2px rgba(0,0,0,.03); }
+.stat-card .label { font-size: .8rem; color: #6b7280; text-transform: uppercase; letter-spacing: .04em; }
+.stat-card .value { font-size: 1.75rem; font-weight: 700; }
+.stat-card .icon { width: 42px; height: 42px; border-radius: .6rem; display: grid; place-items: center; font-size: 1.2rem; }
+
+/* Status badges */
+.badge-status { font-weight: 600; padding: .35em .65em; border-radius: 999px; font-size: .75rem; }
+.st-New { background: #e0e7ff; color: #3730a3; }
+.st-Contacted { background: #e0f2fe; color: #075985; }
+.st-Qualified { background: #fef3c7; color: #92400e; }
+.st-Proposal { background: #ede9fe; color: #5b21b6; }
+.st-Won { background: #dcfce7; color: #166534; }
+.st-Lost { background: #fee2e2; color: #991b1b; }
+.st-Pending { background: #f3f4f6; color: #374151; }
+.st-Due { background: #ffedd5; color: #9a3412; }
+.st-Completed { background: #dcfce7; color: #166534; }
+.st-Cancelled { background: #f3f4f6; color: #6b7280; }
+.st-Draft { background: #e0e7ff; color: #3730a3; }
+.st-Sent { background: #dcfce7; color: #166534; }
+.st-Failed { background: #fee2e2; color: #991b1b; }
+
+.table > :not(caption) > * > * { padding: .75rem .9rem; }
+.table thead th { font-size: .75rem; text-transform: uppercase; color: #6b7280; letter-spacing: .04em; background: #f9fafb; }
+.table-hover tbody tr { cursor: pointer; }
+.overdue { color: #b91c1c; font-weight: 600; }
+
+/* Timeline */
+.timeline { list-style: none; padding-left: 0; margin: 0; }
+.timeline li { position: relative; padding: 0 0 1rem 1.5rem; border-left: 2px solid #e5e7eb; margin-left: .4rem; }
+.timeline li::before { content: ""; position: absolute; left: -7px; top: .25rem; width: 12px; height: 12px;
+  border-radius: 50%; background: var(--brand); }
+.timeline li:last-child { padding-bottom: 0; }
+
+/* Login */
+.login-wrap { min-height: 100vh; display: grid; place-items: center;
+  background: linear-gradient(135deg, #1e1b4b 0%, #4f46e5 100%); padding: 1rem; }
+.login-card { max-width: 400px; width: 100%; }
+
+.empty-state { text-align: center; color: #6b7280; padding: 2.5rem 1rem; }
+.empty-state i { font-size: 2rem; display: block; margin-bottom: .5rem; }
+pre.draft-body { white-space: pre-wrap; font-family: inherit; margin: 0; }
+.btn-outline-primary { --bs-btn-color: var(--brand); --bs-btn-border-color: var(--brand);
+  --bs-btn-hover-bg: var(--brand); --bs-btn-hover-border-color: var(--brand); --bs-btn-active-bg: var(--brand-dark); }
+.nav-tabs .nav-link, .nav-pills .nav-link { color: #4b5563; }
+.nav-pills .nav-link.active { background: var(--brand); color: #fff; }
+.nav-tabs .nav-link.active { color: #111827; }
